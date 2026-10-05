@@ -1,0 +1,44 @@
+name: Build ESP-Matter
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Pull ESP-Matter Docker image
+        run: docker pull espressif/esp-matter:latest
+
+      - name: Build
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/project" \
+            -w /project \
+            -e IDF_PATH=/opt/espressif/esp-idf \
+            -e IDF_TOOLS_PATH=/opt/espressif/tools \
+            -e ESP_MATTER_PATH=/opt/espressif/esp-matter \
+            -e NINJA_JOBS=4 \
+            espressif/esp-matter:latest \
+            bash -c "cd /project/light && idf.py build"
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: light-firmware
+          path: |
+            light_switch/build/light.bin
+            light_switch/build/bootloader/bootloader.bin
+            light_switch/build/partition_table/partition-table.bin
+            light_switch/build/ota_data_initial.bin
+            light_switch/build/flasher_args.json
+            light_switch/build/flash_args
+          if-no-files-found: error
