@@ -22,7 +22,7 @@ static esp_err_t transfer(spi_device_handle_t dev, const void *data, size_t size
     t.tx_buffer = data;
     return spi_device_transmit(dev, &t);
 }
-static esp_err_t command(uint8_t cmd, const uint8_t *data = nullptr, size_t size = 0) {
+static esp_err_t lcd_command(uint8_t cmd, const uint8_t *data = nullptr, size_t size = 0) {
     gpio_set_level(GPIO_NUM_2, 0);
     ESP_RETURN_ON_ERROR(transfer(lcd, &cmd, 1), TAG, "command");
     gpio_set_level(GPIO_NUM_2, 1);
@@ -31,9 +31,9 @@ static esp_err_t command(uint8_t cmd, const uint8_t *data = nullptr, size_t size
 static esp_err_t rectangle(int x, int y, int w, int h, uint16_t color) {
     const uint8_t xs[] = {uint8_t(x >> 8), uint8_t(x), uint8_t((x+w-1) >> 8), uint8_t(x+w-1)};
     const uint8_t ys[] = {uint8_t(y >> 8), uint8_t(y), uint8_t((y+h-1) >> 8), uint8_t(y+h-1)};
-    ESP_RETURN_ON_ERROR(command(0x2a, xs, 4), TAG, "column");
-    ESP_RETURN_ON_ERROR(command(0x2b, ys, 4), TAG, "row");
-    ESP_RETURN_ON_ERROR(command(0x2c), TAG, "pixels");
+    ESP_RETURN_ON_ERROR(lcd_command(0x2a, xs, 4), TAG, "column");
+    ESP_RETURN_ON_ERROR(lcd_command(0x2b, ys, 4), TAG, "row");
+    ESP_RETURN_ON_ERROR(lcd_command(0x2c), TAG, "pixels");
     uint8_t pixels[64]; // No full framebuffer or DMA allocation.
     for (size_t i = 0; i < sizeof(pixels); i += 2) {
         pixels[i] = color >> 8; pixels[i+1] = color & 0xff;
@@ -151,9 +151,9 @@ esp_err_t app_display_init() {
         err = spi_bus_add_device(SPI3_HOST, &dev, &touch);
         if (err != ESP_OK) spi_bus_free(SPI3_HOST);
     }
-    if (err == ESP_OK) err = command(0x01);
+    if (err == ESP_OK) err = lcd_command(0x01);
     vTaskDelay(pdMS_TO_TICKS(150));
-    if (err == ESP_OK) err = command(0x28);
+    if (err == ESP_OK) err = lcd_command(0x28);
     // ILI9341 power, timing and gamma registers for the CYD panel.
     struct Init { uint8_t cmd, count, data[15]; };
     static const Init setup[] = {
@@ -167,14 +167,14 @@ esp_err_t app_display_init() {
         {0xe1,15,{0x00,0x15,0x17,0x07,0x11,0x06,0x2b,0x56,0x3c,0x05,0x10,0x0f,0x3f,0x3f,0x0f}}
     };
     for (const auto &item : setup) {
-        if (err == ESP_OK) err = command(item.cmd, item.data, item.count);
+        if (err == ESP_OK) err = lcd_command(item.cmd, item.data, item.count);
     }
     const uint8_t format = 0x55, orientation = 0x48;
-    if (err == ESP_OK) err = command(0x3a, &format, 1);
-    if (err == ESP_OK) err = command(0x36, &orientation, 1);
-    if (err == ESP_OK) err = command(0x11);
+    if (err == ESP_OK) err = lcd_command(0x3a, &format, 1);
+    if (err == ESP_OK) err = lcd_command(0x36, &orientation, 1);
+    if (err == ESP_OK) err = lcd_command(0x11);
     vTaskDelay(pdMS_TO_TICKS(120));
-    if (err == ESP_OK) err = command(0x29);
+    if (err == ESP_OK) err = lcd_command(0x29);
     if (err == ESP_OK && xTaskCreate(display_task, "lcd_touch", 4096, nullptr, 3, nullptr) != pdPASS)
         err = ESP_ERR_NO_MEM;
     if (err != ESP_OK) {
