@@ -17,6 +17,18 @@
 #include <button_gpio.h>
 #include <device.h>
 #include <led_driver.h>
+#include <driver/gpio.h>
+#include "sdkconfig.h"
+
+#if CONFIG_CYD_DISPLAY
+static esp_err_t cyd_set_power(bool on)
+{
+#if CONFIG_CYD_LIGHT_ACTIVE_LOW
+    on = !on;
+#endif
+    return gpio_set_level(static_cast<gpio_num_t>(CONFIG_CYD_LIGHT_GPIO), on);
+}
+#endif
 
 using namespace chip::app::Clusters;
 using namespace chip::app::Clusters::ColorControl::Attributes;
@@ -25,6 +37,7 @@ using namespace esp_matter;
 static const char *TAG = "app_driver";
 extern uint16_t light_endpoint_id;
 
+#if !CONFIG_CYD_DISPLAY
 // Global variables to store current XY color coordinates
 static uint16_t current_x = 0;
 static uint16_t current_y = 0;
@@ -114,6 +127,8 @@ static esp_err_t app_driver_light_apply_color_mode(led_driver_handle_t handle, u
     }
 }
 
+#endif
+
 static void app_driver_button_toggle_cb(void *arg, void *data)
 {
     ESP_LOGI(TAG, "Toggle button pressed");
@@ -132,6 +147,13 @@ static void app_driver_button_toggle_cb(void *arg, void *data)
 esp_err_t app_driver_attribute_update(app_driver_handle_t driver_handle, uint16_t endpoint_id, uint32_t cluster_id,
                                       uint32_t attribute_id, esp_matter_attr_val_t *val)
 {
+#if CONFIG_CYD_DISPLAY
+    if (endpoint_id == light_endpoint_id && cluster_id == OnOff::Id &&
+        attribute_id == OnOff::Attributes::OnOff::Id) {
+        return cyd_set_power(val->val.b);
+    }
+    return ESP_OK;
+#else
     esp_err_t err = ESP_OK;
     if (endpoint_id == light_endpoint_id) {
         led_driver_handle_t handle = (led_driver_handle_t)driver_handle;
@@ -164,11 +186,17 @@ esp_err_t app_driver_attribute_update(app_driver_handle_t driver_handle, uint16_
         }
     }
     return err;
+#endif
 }
 
 esp_err_t app_driver_light_set_defaults(uint16_t endpoint_id)
 {
     esp_err_t err = ESP_OK;
+#if CONFIG_CYD_DISPLAY
+    esp_matter_attr_val_t power = {};
+    err = attribute::get_val(endpoint_id, OnOff::Id, OnOff::Attributes::OnOff::Id, &power);
+    return err == ESP_OK ? cyd_set_power(power.val.b) : err;
+#else
     void *priv_data = endpoint::get_priv_data(endpoint_id);
     led_driver_handle_t handle = (led_driver_handle_t)priv_data;
     esp_matter_attr_val_t val;
@@ -189,14 +217,30 @@ esp_err_t app_driver_light_set_defaults(uint16_t endpoint_id)
     err |= app_driver_light_set_power(handle, &val);
 
     return err;
+#endif
 }
 
 app_driver_handle_t app_driver_light_init()
 {
+#if CONFIG_CYD_DISPLAY
+    constexpr int pin = CONFIG_CYD_LIGHT_GPIO;
+    static_assert(GPIO_IS_VALID_OUTPUT_GPIO(pin), "CYD light GPIO is not an output pin");
+    static_assert(pin != 0 && pin != 2 && pin != 12 && pin != 13 && pin != 14 && pin != 15 &&
+                  pin != 21 && pin != 25 && pin != 32 && pin != 33 && !(pin >= 6 && pin <= 11),
+                  "CYD light GPIO conflicts with display, touch, flash or boot button");
+    gpio_config_t output = {};
+    output.pin_bit_mask = 1ULL << pin;
+    output.mode = GPIO_MODE_OUTPUT;
+    ESP_ERROR_CHECK(gpio_config(&output));
+    ESP_ERROR_CHECK(cyd_set_power(false));
+    static int cyd_handle;
+    return &cyd_handle;
+#else
     /* Initialize led */
     led_driver_config_t config = led_driver_get_config();
     led_driver_handle_t handle = led_driver_init(&config);
     return (app_driver_handle_t)handle;
+#endif
 }
 
 app_driver_handle_t app_driver_button_init()
