@@ -28,7 +28,11 @@
 #define MATTER_TEMPERATURE_FACTOR 1000000
 
 /** Default attribute values used during initialization */
+#if CONFIG_IDF_TARGET_ESP32S2
+#define DEFAULT_POWER false
+#else
 #define DEFAULT_POWER true
+#endif
 #define DEFAULT_BRIGHTNESS 64
 #define DEFAULT_HUE 128
 #define DEFAULT_SATURATION 254

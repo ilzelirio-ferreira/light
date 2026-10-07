@@ -19,6 +19,7 @@
 #include <led_driver.h>
 #include <driver/gpio.h>
 #include "sdkconfig.h"
+#include "app_relay.h"
 
 #if CONFIG_CYD_DISPLAY
 static esp_err_t cyd_set_power(bool on)
@@ -37,7 +38,7 @@ using namespace esp_matter;
 static const char *TAG = "app_driver";
 extern uint16_t light_endpoint_id;
 
-#if !CONFIG_CYD_DISPLAY
+#if !CONFIG_CYD_DISPLAY && !CONFIG_IDF_TARGET_ESP32S2
 // Global variables to store current XY color coordinates
 static uint16_t current_x = 0;
 static uint16_t current_y = 0;
@@ -153,6 +154,12 @@ esp_err_t app_driver_attribute_update(app_driver_handle_t driver_handle, uint16_
         return cyd_set_power(val->val.b);
     }
     return ESP_OK;
+#elif CONFIG_IDF_TARGET_ESP32S2
+    if (endpoint_id == light_endpoint_id && cluster_id == OnOff::Id &&
+        attribute_id == OnOff::Attributes::OnOff::Id) {
+        return app_relay_set_power(val->val.b);
+    }
+    return ESP_OK;
 #else
     esp_err_t err = ESP_OK;
     if (endpoint_id == light_endpoint_id) {
@@ -196,6 +203,10 @@ esp_err_t app_driver_light_set_defaults(uint16_t endpoint_id)
     esp_matter_attr_val_t power = {};
     err = attribute::get_val(endpoint_id, OnOff::Id, OnOff::Attributes::OnOff::Id, &power);
     return err == ESP_OK ? cyd_set_power(power.val.b) : err;
+#elif CONFIG_IDF_TARGET_ESP32S2
+    esp_matter_attr_val_t power = {};
+    err = attribute::get_val(endpoint_id, OnOff::Id, OnOff::Attributes::OnOff::Id, &power);
+    return err == ESP_OK ? app_relay_set_power(power.val.b) : err;
 #else
     void *priv_data = endpoint::get_priv_data(endpoint_id);
     led_driver_handle_t handle = (led_driver_handle_t)priv_data;
@@ -235,6 +246,10 @@ app_driver_handle_t app_driver_light_init()
     ESP_ERROR_CHECK(cyd_set_power(false));
     static int cyd_handle;
     return &cyd_handle;
+#elif CONFIG_IDF_TARGET_ESP32S2
+    ESP_ERROR_CHECK(app_relay_init());
+    static int relay_handle;
+    return &relay_handle;
 #else
     /* Initialize led */
     led_driver_config_t config = led_driver_get_config();

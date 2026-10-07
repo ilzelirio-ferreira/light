@@ -20,6 +20,7 @@
 
 #include <app_priv.h>
 #include "app_display.h"
+#include "app_relay.h"
 #include <app_reset.h>
 #if CHIP_DEVICE_CONFIG_ENABLE_THREAD
 #include <platform/ESP32/OpenthreadLauncher.h>
@@ -250,7 +251,8 @@ extern "C" void app_main()
     MEMORY_PROFILER_DUMP_HEAP_STAT("matter started");
 
     /* Starting driver with default values */
-    app_driver_light_set_defaults(light_endpoint_id);
+    ESP_ERROR_CHECK(app_driver_light_set_defaults(light_endpoint_id));
+    ESP_ERROR_CHECK(app_relay_start_switch());
     err = app_display_init();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Display initialization failed: %s", esp_err_to_name(err));

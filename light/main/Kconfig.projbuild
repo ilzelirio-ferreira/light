@@ -22,6 +22,14 @@ menu "Example Configuration"
         depends on CYD_DISPLAY
         default y
 
+    config RELAY_ACTIVE_LOW
+        bool "GPIO 4 relay is active low (ESP32-S2)"
+        depends on IDF_TARGET_ESP32S2
+        default y
+        help
+            Enabled: LOW turns the relay on. Disabled: HIGH turns it on.
+            GPIO 2 is a dry-contact wall switch to GND with internal pull-up.
+
     config ENABLE_MEMORY_PROFILING
         bool "Enable Memory Profiling"
         default n

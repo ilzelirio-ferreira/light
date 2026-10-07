@@ -91,7 +91,7 @@ Os binarios existentes na raiz nao incluem estas alteracoes.
 ## ESP32-S2: teste Matter sem tela
 
 O workflow seleciona `esp32s2`. Esse alvo usa o perfil `hollow` do ESP-Matter:
-nenhum LED ou botao fisico e acionado e o display CYD fica desativado. O estado
+o display CYD fica desativado. O rele e o interruptor usam GPIOs conforme descrito abaixo. O estado
 da luz e seus atributos podem ser controlados pelo Matter e consultados pelo
 console serial.
 
@@ -101,3 +101,24 @@ console serial e use um controlador com comissionamento Matter na rede IP
 
 O firmware ESP32-S2 deve ser gravado somente na nova placa ESP32-S2.
 A ESP32-2432S028R continua sendo alvo `esp32`.
+
+## Interruptor e rele na ESP32-S2
+
+- GPIO 2: interruptor de contato seco ligado entre GPIO 2 e GND; pull-up interno.
+- GPIO 4: entrada IN de modulo rele compativel com sinal de 3,3 V; ativo em LOW.
+- GND da placa e do modulo rele devem estar conectados.
+
+Cada mudanca estavel de posicao do interruptor alterna o atributo OnOff do
+Matter, com debounce de aproximadamente 80 ms. Um interruptor mantido na
+mesma posicao nao repete comandos. Este comportamento e para interruptor
+convencional de duas posicoes; um botao momentaneo alternaria ao pressionar
+e ao soltar. O comando passa pela tarefa Matter, assim aplicativo e rele
+permanecem sincronizados. O interruptor nao executa reset de fabrica.
+
+O rele inicia inativo antes de aplicar o estado Matter restaurado. Em uma
+instalacao nova, o estado inicial e desligado. Brilho e cor nao controlam o
+rele. A opcao RELAY_ACTIVE_LOW no menuconfig permite mudar a polaridade.
+
+Use apenas contato seco no GPIO 2. Nunca aplique tensao da rede eletrica nos
+GPIOs e nao ligue a bobina de um rele diretamente ao GPIO 4: use um modulo
+com driver adequado. As ligacoes da lampada ficam nos contatos do rele.
