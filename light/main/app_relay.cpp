@@ -4,6 +4,7 @@
 #include <driver/gpio.h>
 #include <esp_check.h>
 #include <esp_matter.h>
+#include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <platform/CHIPDeviceLayer.h>
@@ -23,6 +24,49 @@ static Channel channels[APP_RELAY_CHANNEL_COUNT] = {
     {GPIO_NUM_16, GPIO_NUM_17, 0},
 };
 static std::atomic<bool> pending[APP_RELAY_CHANNEL_COUNT]{};
+// One falling edge per mains cycle with a half-wave PC817 circuit.
+static constexpr uint32_t MIN_PERIOD_US = 14000;
+static constexpr uint32_t MAX_PERIOD_US = 19000;
+static constexpr uint32_t ABSENCE_US = 100000;
+struct PulseState {
+    int64_t edge_us;
+    int64_t valid_us;
+    unsigned consecutive;
+    bool seen;
+    bool qualified;
+};
+static PulseState pulses[APP_RELAY_CHANNEL_COUNT]{};
+static portMUX_TYPE pulse_lock = portMUX_INITIALIZER_UNLOCKED;
+
+static void pulse_isr(void *arg)
+{
+    const unsigned channel = static_cast<unsigned>(reinterpret_cast<uintptr_t>(arg));
+    const int64_t now = esp_timer_get_time();
+    portENTER_CRITICAL_ISR(&pulse_lock);
+    auto &pulse = pulses[channel];
+    const int64_t period = now - pulse.edge_us;
+    if (pulse.seen && period >= MIN_PERIOD_US && period <= MAX_PERIOD_US) {
+        if (pulse.consecutive < 4) ++pulse.consecutive;
+    } else {
+        pulse.consecutive = 0;
+    }
+    pulse.edge_us = now;
+    pulse.seen = true;
+    if (pulse.consecutive >= 4) {
+        pulse.valid_us = now;
+        pulse.qualified = true;
+    }
+    portEXIT_CRITICAL_ISR(&pulse_lock);
+}
+
+static bool signal_present(unsigned channel)
+{
+    portENTER_CRITICAL(&pulse_lock);
+    const PulseState pulse = pulses[channel];
+    portEXIT_CRITICAL(&pulse_lock);
+    const int64_t now = esp_timer_get_time();
+    return pulse.qualified && (now - pulse.valid_us) < ABSENCE_US;
+}
 
 static esp_err_t set_channel_power(unsigned channel, bool on)
 {
@@ -102,33 +146,39 @@ static void toggle(intptr_t channel)
 
 static void switch_task(void *)
 {
-    int stable[APP_RELAY_CHANNEL_COUNT], candidate[APP_RELAY_CHANNEL_COUNT];
-    unsigned samples[APP_RELAY_CHANNEL_COUNT]{};
+    bool stable[APP_RELAY_CHANNEL_COUNT];
+    // Establish the initial AC state without changing restored Matter states.
+    vTaskDelay(pdMS_TO_TICKS(200));
     for (unsigned i = 0; i < APP_RELAY_CHANNEL_COUNT; ++i)
-        stable[i] = candidate[i] = gpio_get_level(channels[i].input);
-    // Initial positions do not override restored Matter states.
+        stable[i] = signal_present(i);
     while (true) {
         for (unsigned i = 0; i < APP_RELAY_CHANNEL_COUNT; ++i) {
-            int level = gpio_get_level(channels[i].input);
-            if (level != candidate[i]) { candidate[i] = level; samples[i] = 1; }
-            else if (samples[i] < 4) { ++samples[i]; }
-            if (samples[i] >= 4 && candidate[i] != stable[i] && !pending[i].exchange(true)) {
+            const bool present = signal_present(i);
+            if (present != stable[i] && !pending[i].exchange(true)) {
                 if (chip::DeviceLayer::PlatformMgr().ScheduleWork(toggle, i) == CHIP_NO_ERROR) {
-                    stable[i] = candidate[i];
+                    stable[i] = present;
+                    ESP_LOGI(TAG, "Channel %u: 60 Hz %s", i + 1, present ? "present" : "absent");
                 } else {
                     pending[i].store(false);
                     ESP_LOGE(TAG, "Could not schedule channel %u", i + 1);
                 }
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(20));
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
 esp_err_t app_relay_start_switch()
 {
     for (const auto &item : channels) if (!item.endpoint) return ESP_ERR_INVALID_STATE;
-    return xTaskCreate(switch_task, "wall_switch", 3072, nullptr, 3, nullptr) == pdPASS
+    esp_err_t err = gpio_install_isr_service(0);
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) return err;
+    for (unsigned i = 0; i < APP_RELAY_CHANNEL_COUNT; ++i) {
+        ESP_RETURN_ON_ERROR(gpio_isr_handler_add(channels[i].input, pulse_isr,
+                            reinterpret_cast<void *>(static_cast<uintptr_t>(i))), TAG, "pulse handler");
+        ESP_RETURN_ON_ERROR(gpio_set_intr_type(channels[i].input, GPIO_INTR_NEGEDGE), TAG, "pulse edge");
+    }
+    return xTaskCreate(switch_task, "ac_inputs", 3072, nullptr, 3, nullptr) == pdPASS
                ? ESP_OK : ESP_ERR_NO_MEM;
 }
 #else

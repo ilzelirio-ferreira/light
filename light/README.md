@@ -115,16 +115,30 @@ Cada canal e um endpoint Matter On/Off independente, na ordem abaixo:
 | 5 | GPIO 18 | GPIO 21 |
 | 6 | GPIO 16 | GPIO 17 |
 
-As saidas sao ativas em LOW. Conecte cada entrada a GND atraves de um
-interruptor de contato seco; o pull-up interno fica habilitado. O GND da
-placa e dos modulos rele deve ser comum. GPIO 2 e GPIO 4 deixam de ser usados.
-GPIO 19 e GPIO 20 permanecem disponiveis para o USB nativo.
+As saidas sao ativas em LOW. Cada entrada recebe o coletor (pino 4) de
+um PC817, com emissor (pino 3) ao GND do ESP32 e pull-up para 3,3 V.
+O pull-up interno fica habilitado; recomenda-se pull-up externo de 10 kohms.
+GPIO 2 e GPIO 4 deixam de ser usados; GPIO 19/20 ficam para USB nativo.
 
-Cada mudanca de posicao estavel por aproximadamente 80 ms alterna somente
-o canal correspondente. A posicao inicial do interruptor nao substitui o
-estado Matter restaurado. Segurar a posicao nao repete comandos. Este perfil
-e para interruptores convencionais, nao botoes momentaneos (que mudam de
-estado ao pressionar e ao soltar). Os comandos passam pela tarefa Matter.
+A entrada detecta pulsos ativos em LOW de meia onda a 60 Hz, com periodos
+entre 14 e 19 ms. Quatro periodos consecutivos validos confirmam presenca;
+100 ms sem pulsos validos confirmam ausencia. Um nivel LOW constante nao
+conta como presenca. Retificacao de onda completa (120 Hz) nao e suportada
+por esta configuracao. Interrupcoes capturam os pulsos independentemente
+da tarefa de controle.
+
+Cada transicao entre presenca e ausencia inverte somente o rele correspondente.
+O sinal mantido nao repete comandos nem impede comandos pelo Matter.
+A leitura inicial, apos 200 ms, nao altera os estados Matter restaurados.
+Os comandos passam pela tarefa Matter.
+
+O circuito de rede de 127 V precisa de protecao reversa para o LED do PC817
+(diodo em antiparalelo: catodo no pino 1, anodo no pino 2). O limite reverso
+do PC817 e 6 V. Com 47 kohms, a dissipacao aproximada do conjunto resistivo
+com esse diodo e 127^2/47000 = 0,34 W. Dimensione potencia com margem,
+tensao de trabalho, isolacao e distancias da placa para a rede; o esquema
+original sem diodo nao deve ser ligado a rede. Nao conecte neutro ao GND
+do ESP32. Os GPIOs recebem somente o lado isolado de 3,3 V.
 
 Os seis reles iniciam inativos antes de aplicar seus estados restaurados;
 para uma instalacao nova, os estados iniciais sao desligados. Brilho e cor
@@ -135,9 +149,9 @@ O limite de endpoints foi ampliado para sete: raiz e seis canais. Ao migrar
 do firmware de um canal, o controlador Matter pode precisar redescobrir ou
 adicionar novamente o dispositivo para apresentar os seis endpoints.
 
-Use modulos rele compativeis com sinais de 3,3 V e contatos secos nas entradas.
+Use modulos rele compativeis com sinais de 3,3 V e optoacopladores nas entradas.
 Nao ligue bobinas diretamente aos GPIOs e nunca aplique rede eletrica neles.
 
 Validacao na placa: acionar cada interruptor nos dois sentidos e confirmar
 somente seu rele; controlar cada endpoint pelo Matter; testar mudancas
-simultaneas, contatos com ruido e reinicializacao com restauracao de estados.
+simultaneas, pulsos com ruido e reinicializacao com restauracao de estados.
