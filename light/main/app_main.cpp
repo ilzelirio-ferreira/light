@@ -190,6 +190,18 @@ extern "C" void app_main()
 
     MEMORY_PROFILER_DUMP_HEAP_STAT("node created");
 
+#if CONFIG_IDF_TARGET_ESP32S2
+    for (unsigned channel = 0; channel < APP_RELAY_CHANNEL_COUNT; ++channel) {
+        on_off_light::config_t relay_config;
+        relay_config.on_off.on_off = DEFAULT_POWER;
+        relay_config.on_off_lighting.start_up_on_off = nullptr;
+        endpoint_t *relay_endpoint = on_off_light::create(node, &relay_config, ENDPOINT_FLAG_NONE, light_handle);
+        ABORT_APP_ON_FAILURE(relay_endpoint != nullptr, ESP_LOGE(TAG, "Failed to create relay channel %u", channel + 1));
+        const uint16_t relay_id = endpoint::get_id(relay_endpoint);
+        ESP_ERROR_CHECK(app_relay_register_endpoint(channel, relay_id));
+        if (channel == 0) light_endpoint_id = relay_id;
+    }
+#else
     extended_color_light::config_t light_config;
     light_config.on_off.on_off = DEFAULT_POWER;
     light_config.on_off_lighting.start_up_on_off = nullptr;
@@ -217,6 +229,8 @@ extern "C" void app_main()
     attribute::set_deferred_persistence(current_y_attribute);
     attribute_t *color_temp_attribute = attribute::get(light_endpoint_id, ColorControl::Id, ColorControl::Attributes::ColorTemperatureMireds::Id);
     attribute::set_deferred_persistence(color_temp_attribute);
+
+#endif
 
 #if CHIP_DEVICE_CONFIG_ENABLE_THREAD && CHIP_DEVICE_CONFIG_ENABLE_WIFI_STATION
     // Enable secondary network interface
@@ -251,7 +265,13 @@ extern "C" void app_main()
     MEMORY_PROFILER_DUMP_HEAP_STAT("matter started");
 
     /* Starting driver with default values */
+#if CONFIG_IDF_TARGET_ESP32S2
+    for (unsigned channel = 0; channel < APP_RELAY_CHANNEL_COUNT; ++channel) {
+        ESP_ERROR_CHECK(app_driver_light_set_defaults(app_relay_endpoint(channel)));
+    }
+#else
     ESP_ERROR_CHECK(app_driver_light_set_defaults(light_endpoint_id));
+#endif
     ESP_ERROR_CHECK(app_relay_start_switch());
     err = app_display_init();
     if (err != ESP_OK) {

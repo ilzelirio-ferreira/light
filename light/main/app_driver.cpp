@@ -155,9 +155,9 @@ esp_err_t app_driver_attribute_update(app_driver_handle_t driver_handle, uint16_
     }
     return ESP_OK;
 #elif CONFIG_IDF_TARGET_ESP32S2
-    if (endpoint_id == light_endpoint_id && cluster_id == OnOff::Id &&
+    if (app_relay_has_endpoint(endpoint_id) && cluster_id == OnOff::Id &&
         attribute_id == OnOff::Attributes::OnOff::Id) {
-        return app_relay_set_power(val->val.b);
+        return app_relay_set_power(endpoint_id, val->val.b);
     }
     return ESP_OK;
 #else
@@ -206,7 +206,7 @@ esp_err_t app_driver_light_set_defaults(uint16_t endpoint_id)
 #elif CONFIG_IDF_TARGET_ESP32S2
     esp_matter_attr_val_t power = {};
     err = attribute::get_val(endpoint_id, OnOff::Id, OnOff::Attributes::OnOff::Id, &power);
-    return err == ESP_OK ? app_relay_set_power(power.val.b) : err;
+    return err == ESP_OK ? app_relay_set_power(endpoint_id, power.val.b) : err;
 #else
     void *priv_data = endpoint::get_priv_data(endpoint_id);
     led_driver_handle_t handle = (led_driver_handle_t)priv_data;

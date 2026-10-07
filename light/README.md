@@ -102,23 +102,42 @@ console serial e use um controlador com comissionamento Matter na rede IP
 O firmware ESP32-S2 deve ser gravado somente na nova placa ESP32-S2.
 A ESP32-2432S028R continua sendo alvo `esp32`.
 
-## Interruptor e rele na ESP32-S2
+## Seis interruptores e reles na ESP32-S2
 
-- GPIO 2: interruptor de contato seco ligado entre GPIO 2 e GND; pull-up interno.
-- GPIO 4: entrada IN de modulo rele compativel com sinal de 3,3 V; ativo em LOW.
-- GND da placa e do modulo rele devem estar conectados.
+Cada canal e um endpoint Matter On/Off independente, na ordem abaixo:
 
-Cada mudanca estavel de posicao do interruptor alterna o atributo OnOff do
-Matter, com debounce de aproximadamente 80 ms. Um interruptor mantido na
-mesma posicao nao repete comandos. Este comportamento e para interruptor
-convencional de duas posicoes; um botao momentaneo alternaria ao pressionar
-e ao soltar. O comando passa pela tarefa Matter, assim aplicativo e rele
-permanecem sincronizados. O interruptor nao executa reset de fabrica.
+| Canal | Saida do rele (S) | Entrada do interruptor (E) |
+| --- | --- | --- |
+| 1 | GPIO 39 | GPIO 40 |
+| 2 | GPIO 37 | GPIO 38 |
+| 3 | GPIO 35 | GPIO 36 |
+| 4 | GPIO 33 | GPIO 34 |
+| 5 | GPIO 18 | GPIO 21 |
+| 6 | GPIO 16 | GPIO 17 |
 
-O rele inicia inativo antes de aplicar o estado Matter restaurado. Em uma
-instalacao nova, o estado inicial e desligado. Brilho e cor nao controlam o
-rele. A opcao RELAY_ACTIVE_LOW no menuconfig permite mudar a polaridade.
+As saidas sao ativas em LOW. Conecte cada entrada a GND atraves de um
+interruptor de contato seco; o pull-up interno fica habilitado. O GND da
+placa e dos modulos rele deve ser comum. GPIO 2 e GPIO 4 deixam de ser usados.
+GPIO 19 e GPIO 20 permanecem disponiveis para o USB nativo.
 
-Use apenas contato seco no GPIO 2. Nunca aplique tensao da rede eletrica nos
-GPIOs e nao ligue a bobina de um rele diretamente ao GPIO 4: use um modulo
-com driver adequado. As ligacoes da lampada ficam nos contatos do rele.
+Cada mudanca de posicao estavel por aproximadamente 80 ms alterna somente
+o canal correspondente. A posicao inicial do interruptor nao substitui o
+estado Matter restaurado. Segurar a posicao nao repete comandos. Este perfil
+e para interruptores convencionais, nao botoes momentaneos (que mudam de
+estado ao pressionar e ao soltar). Os comandos passam pela tarefa Matter.
+
+Os seis reles iniciam inativos antes de aplicar seus estados restaurados;
+para uma instalacao nova, os estados iniciais sao desligados. Brilho e cor
+nao sao anunciados pelos endpoints de rele. RELAY_ACTIVE_LOW permite mudar
+a polaridade das seis saidas juntas no menuconfig.
+
+O limite de endpoints foi ampliado para sete: raiz e seis canais. Ao migrar
+do firmware de um canal, o controlador Matter pode precisar redescobrir ou
+adicionar novamente o dispositivo para apresentar os seis endpoints.
+
+Use modulos rele compativeis com sinais de 3,3 V e contatos secos nas entradas.
+Nao ligue bobinas diretamente aos GPIOs e nunca aplique rede eletrica neles.
+
+Validacao na placa: acionar cada interruptor nos dois sentidos e confirmar
+somente seu rele; controlar cada endpoint pelo Matter; testar mudancas
+simultaneas, contatos com ruido e reinicializacao com restauracao de estados.

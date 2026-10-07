@@ -11,5 +11,7 @@ CONFIG_ESP_CONSOLE_USB_CDC=y
 CONFIG_LIBC_PICOLIBC=n
 CONFIG_LIBC_NEWLIB=y
 
-# Wall switch on GPIO 2; active-low relay on GPIO 4.
+# Six independent wall switches and active-low relay outputs.
 CONFIG_RELAY_ACTIVE_LOW=y
+
+CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT=7
