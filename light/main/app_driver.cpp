@@ -245,6 +245,10 @@ app_driver_handle_t app_driver_light_init()
 
 app_driver_handle_t app_driver_button_init()
 {
+#if CONFIG_IDF_TARGET_ESP32S2
+    // Matter-only profile: no assumed physical button wiring.
+    return nullptr;
+#else
     /* Initialize button */
     button_handle_t handle = NULL;
     const button_config_t btn_cfg = {0};
@@ -257,4 +261,5 @@ app_driver_handle_t app_driver_button_init()
 
     iot_button_register_cb(handle, BUTTON_PRESS_DOWN, NULL, app_driver_button_toggle_cb, NULL);
     return (app_driver_handle_t)handle;
+#endif
 }

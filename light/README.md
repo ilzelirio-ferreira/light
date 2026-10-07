@@ -87,3 +87,17 @@ Referencias de hardware e inicializacao:
 
 A integracao ainda requer compilacao com ESP-Matter e teste na placa.
 Os binarios existentes na raiz nao incluem estas alteracoes.
+
+## ESP32-S2: teste Matter sem tela
+
+O workflow seleciona `esp32s2`. Esse alvo usa o perfil `hollow` do ESP-Matter:
+nenhum LED ou botao fisico e acionado e o display CYD fica desativado. O estado
+da luz e seus atributos podem ser controlados pelo Matter e consultados pelo
+console serial.
+
+A ESP32-S2 nao possui Bluetooth. Para comissionar, configure o Wi-Fi pelo
+console serial e use um controlador com comissionamento Matter na rede IP
+(on-network). O pareamento inicial por Bluetooth nao funciona nesse alvo.
+
+O firmware ESP32-S2 deve ser gravado somente na nova placa ESP32-S2.
+A ESP32-2432S028R continua sendo alvo `esp32`.

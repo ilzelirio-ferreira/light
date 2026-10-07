@@ -1,0 +1,4 @@
+# ESP32-S2: Wi-Fi Matter test, no Bluetooth or CYD screen.
+CONFIG_BT_ENABLED=n
+CONFIG_BT_NIMBLE_ENABLED=n
+CONFIG_CYD_DISPLAY=n
