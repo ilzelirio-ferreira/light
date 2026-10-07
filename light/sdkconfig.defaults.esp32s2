@@ -6,3 +6,7 @@ CONFIG_CYD_DISPLAY=n
 # Keep the native USB connection available as the serial console.
 CONFIG_ESP_CONSOLE_UART_DEFAULT=n
 CONFIG_ESP_CONSOLE_USB_CDC=y
+
+# ROM text routines use Newlib reentrancy structures on ESP32-S2.
+CONFIG_LIBC_PICOLIBC=n
+CONFIG_LIBC_NEWLIB=y

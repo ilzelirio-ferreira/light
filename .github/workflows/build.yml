@@ -36,6 +36,8 @@ jobs:
           name: light-firmware
           path: |
             light/build/light.bin
+            light/build/light.elf
+            light/build/light.map
             light/build/bootloader/bootloader.bin
             light/build/partition_table/partition-table.bin
             light/build/ota_data_initial.bin
