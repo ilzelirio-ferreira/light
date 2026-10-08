@@ -1,7 +1,7 @@
 # Light
 
-This example creates a Color Temperature Light device using the ESP
-Matter data model.
+Controlador ESP32-S2 com seis reles independentes via Matter, seis entradas
+de 60 Hz por optoacopladores e portal web para Wi-Fi, nomes e OTA.
 
 See the [docs](https://docs.espressif.com/projects/esp-matter/en/latest/esp32/developing.html) for more information about building and flashing the firmware.
 

@@ -10,7 +10,7 @@ CONFIG_ESP_CONSOLE_USB_CDC=y
 CONFIG_LIBC_PICOLIBC=n
 CONFIG_LIBC_NEWLIB=y
 
-# Six independent wall switches and active-low relay outputs.
+# Six independent 60 Hz optocoupler inputs and active-low relay outputs.
 CONFIG_RELAY_ACTIVE_LOW=y
 
 CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT=7

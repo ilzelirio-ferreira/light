@@ -15,6 +15,12 @@ int main() {
     CHECK(portal_key("configurar123"));
     CHECK(!portal_key("1234567"));
     CHECK(!portal_key("senha\xc3\xa1" "abc"));
+    char shortened[64] = "configurar123 senha antiga";
+    memcpy(shortened, "12345678", 9); // Old bytes beyond NUL must not affect login.
+    CHECK(portal_key_matches("12345678",8,shortened));
+    CHECK(!portal_key_matches("1234567",7,shortened));
+    CHECK(!portal_key_matches("12345679",8,shortened));
+    CHECK(!portal_key_matches("",0,shortened));
     const uint8_t ip[4] = {192,168,4,1};
     uint8_t query[64] = {0x12,0x34,1,0,0,1,0,0,0,0,0,0,3,'a','b','c',0,0,1,0,1};
     uint8_t packet[64];

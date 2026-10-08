@@ -37,9 +37,17 @@ inline bool portal_key(const char *s) {
     return true;
 }
 
+inline bool portal_key_matches(const char *provided, size_t length, const char *expected) {
+    if (!provided || !expected || length == 0 || length > 63) return false;
+    unsigned diff = length ^ strlen(expected);
+    for (size_t i = 0; i < length; ++i)
+        diff |= static_cast<unsigned char>(provided[i] ^ expected[i]);
+    return diff == 0;
+}
+
 // Minimal DNS: one uncompressed IN question. All A names point to the AP.
 inline size_t portal_dns_reply(uint8_t *b, size_t n, size_t capacity, const uint8_t ip[4]) {
-    if (n < 12 || (b[2] & 0xf8) || b[4] != 0 || b[5] != 1) return 0;
+    if (n > capacity || n < 12 || (b[2] & 0xf8) || b[4] != 0 || b[5] != 1) return 0;
     size_t p = 12;
     while (p < n && b[p]) {
         unsigned len = b[p++];

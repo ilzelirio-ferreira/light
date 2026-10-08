@@ -78,7 +78,7 @@ esp_err_t app_portal_load()
             for (const auto &name : saved.names) valid = valid && portal_text(name, 16);
         }
         if (valid) config = saved;
-        else if (err != ESP_ERR_NVS_NOT_FOUND) return err == ESP_OK ? ESP_ERR_INVALID_STATE : err;
+        else if (err != ESP_ERR_NVS_NOT_FOUND) ESP_LOGW(TAG, "Invalid portal config; using setup defaults");
     } else if (err != ESP_ERR_NVS_NOT_FOUND) return err;
     auto &provider = chip::DeviceLayer::StaticESP32DeviceInfoProvider::GetDefaultInstance();
     esp_matter::set_custom_device_info_provider(&provider);
@@ -121,9 +121,10 @@ static bool authenticated(httpd_req_t *req)
         reply(req, "401 Unauthorized", "Informe a senha do painel.");
         return false;
     }
-    unsigned diff = length ^ strlen(config.key);
-    for (size_t i = 0; i < length; ++i) diff |= static_cast<unsigned char>(key[i] ^ config.key[i]);
-    if (diff) { reply(req, "401 Unauthorized", "Senha do painel incorreta."); return false; }
+    if (!portal_key_matches(key, length, config.key)) {
+        reply(req, "401 Unauthorized", "Senha do painel incorreta.");
+        return false;
+    }
     // Non-simple custom header also prevents cross-origin form submissions.
     return true;
 }
@@ -350,6 +351,18 @@ static esp_err_t set_ap(bool enabled)
             if (!ap_netif) ap_netif = esp_netif_create_default_wifi_ap();
             if (!ap_netif) return ESP_ERR_NO_MEM;
         }
+        esp_netif_ip_info_t ip = {};
+        ESP_RETURN_ON_ERROR(esp_netif_get_ip_info(ap_netif, &ip), TAG, "AP IP");
+        esp_netif_dns_info_t dns = {};
+        dns.ip.type = ESP_IPADDR_TYPE_V4;
+        dns.ip.u_addr.ip4 = ip.ip;
+        uint8_t offer_dns = 0x02; // DHCPS_OFFER_DNS, as in IDF softap_sta example.
+        esp_netif_dhcps_stop(ap_netif);
+        ESP_RETURN_ON_ERROR(esp_netif_dhcps_option(ap_netif, ESP_NETIF_OP_SET,
+                            ESP_NETIF_DOMAIN_NAME_SERVER, &offer_dns, sizeof(offer_dns)), TAG, "DHCP DNS");
+        ESP_RETURN_ON_ERROR(esp_netif_set_dns_info(ap_netif, ESP_NETIF_DNS_MAIN, &dns), TAG, "AP DNS");
+        esp_err_t dhcp = esp_netif_dhcps_start(ap_netif);
+        if (dhcp != ESP_OK && dhcp != ESP_ERR_ESP_NETIF_DHCP_ALREADY_STARTED) return dhcp;
         wifi_config_t ap = {};
         snprintf(reinterpret_cast<char *>(ap.ap.ssid), sizeof(ap.ap.ssid), "%s", ap_name);
         ap.ap.ssid_len = strlen(ap_name);
