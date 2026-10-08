@@ -68,7 +68,7 @@ Cada canal e um endpoint Matter On/Off independente, na ordem abaixo:
 
 As saidas sao ativas em LOW. Cada entrada recebe o coletor (pino 4) de
 um PC817, com emissor (pino 3) ao GND do ESP32 e pull-up para 3,3 V.
-O pull-up interno fica habilitado; recomenda-se pull-up externo de 10 kohms.
+As seis entradas usam o pull-up interno habilitado no GPIO.
 GPIO 2 e GPIO 4 deixam de ser usados; GPIO 19/20 ficam para USB nativo.
 
 A entrada detecta pulsos ativos em LOW de meia onda a 60 Hz, com periodos

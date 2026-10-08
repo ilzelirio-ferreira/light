@@ -25,7 +25,8 @@
 #include <freertos/task.h>
 #include <lwip/sockets.h>
 #include <platform/CHIPDeviceLayer.h>
-#include <platform/ESP32/StaticESP32DeviceInfoProvider.h>
+#include <platform/DeviceInfoProvider.h>
+#include <lib/support/CHIPMem.h>
 
 static const char *TAG = "portal";
 struct PortalConfig {
@@ -35,7 +36,58 @@ struct PortalConfig {
     char key[64];
 };
 static PortalConfig config;
-static chip::DeviceLayer::StaticESP32DeviceInfoProvider::FixedLabelEntry labels[APP_RELAY_CHANNEL_COUNT];
+static uint16_t label_endpoints[APP_RELAY_CHANNEL_COUNT]{};
+
+// Local labels do not depend on an ESP32 factory data partition or its keys.
+class NameIterator : public chip::DeviceLayer::DeviceInfoProvider::FixedLabelIterator {
+    unsigned channel;
+    bool consumed = false;
+public:
+    explicit NameIterator(unsigned value) : channel(value) {}
+    size_t Count() override { return channel < APP_RELAY_CHANNEL_COUNT ? 1 : 0; }
+    bool Next(chip::DeviceLayer::DeviceInfoProvider::FixedLabelType &out) override {
+        if (consumed || channel >= APP_RELAY_CHANNEL_COUNT) return false;
+        consumed = true;
+        out.label = chip::CharSpan::fromCharString("name");
+        out.value = chip::CharSpan::fromCharString(config.names[channel]);
+        return true;
+    }
+    void Release() override { chip::Platform::Delete(this); }
+};
+
+template<class T>
+class EmptyIterator : public chip::DeviceLayer::DeviceInfoProvider::Iterator<T> {
+public:
+    size_t Count() override { return 0; }
+    bool Next(T &) override { return false; }
+    void Release() override { chip::Platform::Delete(this); }
+};
+
+class NameProvider : public chip::DeviceLayer::DeviceInfoProvider {
+public:
+    FixedLabelIterator *IterateFixedLabel(chip::EndpointId endpoint) override {
+        unsigned channel = APP_RELAY_CHANNEL_COUNT;
+        for (unsigned i = 0; i < APP_RELAY_CHANNEL_COUNT; ++i)
+            if (label_endpoints[i] == endpoint && endpoint != 0) { channel = i; break; }
+        return chip::Platform::New<NameIterator>(channel);
+    }
+    UserLabelIterator *IterateUserLabel(chip::EndpointId) override {
+        return chip::Platform::New<EmptyIterator<UserLabelType>>();
+    }
+    SupportedLocalesIterator *IterateSupportedLocales() override {
+        return chip::Platform::New<EmptyIterator<chip::CharSpan>>();
+    }
+    SupportedCalendarTypesIterator *IterateSupportedCalendarTypes() override {
+        return chip::Platform::New<EmptyIterator<CalendarType>>();
+    }
+protected:
+    // These clusters are not advertised by this relay controller.
+    CHIP_ERROR SetUserLabelAt(chip::EndpointId, size_t, const UserLabelType &) override { return CHIP_ERROR_NOT_IMPLEMENTED; }
+    CHIP_ERROR DeleteUserLabelAt(chip::EndpointId, size_t) override { return CHIP_ERROR_NOT_IMPLEMENTED; }
+    CHIP_ERROR SetUserLabelLength(chip::EndpointId, size_t) override { return CHIP_ERROR_NOT_IMPLEMENTED; }
+    CHIP_ERROR GetUserLabelLength(chip::EndpointId, size_t &) override { return CHIP_ERROR_NOT_IMPLEMENTED; }
+};
+static NameProvider name_provider;
 static esp_timer_handle_t reboot_timer;
 static esp_netif_t *ap_netif;
 static httpd_handle_t server;
@@ -80,8 +132,7 @@ esp_err_t app_portal_load()
         if (valid) config = saved;
         else if (err != ESP_ERR_NVS_NOT_FOUND) ESP_LOGW(TAG, "Invalid portal config; using setup defaults");
     } else if (err != ESP_ERR_NVS_NOT_FOUND) return err;
-    auto &provider = chip::DeviceLayer::StaticESP32DeviceInfoProvider::GetDefaultInstance();
-    esp_matter::set_custom_device_info_provider(&provider);
+    esp_matter::set_custom_device_info_provider(&name_provider);
     return ESP_OK;
 }
 
@@ -93,13 +144,7 @@ esp_err_t app_portal_add_channel(esp_matter::endpoint_t *endpoint, unsigned chan
     esp_matter::cluster::fixed_label::config_t label_config;
     if (!esp_matter::cluster::fixed_label::create(endpoint, &label_config, esp_matter::CLUSTER_FLAG_SERVER))
         return ESP_ERR_NO_MEM;
-    labels[channel] = {esp_matter::endpoint::get_id(endpoint), chip::CharSpan::fromCharString("name"),
-                       chip::CharSpan::fromCharString(config.names[channel])};
-    if (channel + 1 == APP_RELAY_CHANNEL_COUNT) {
-        auto &provider = chip::DeviceLayer::StaticESP32DeviceInfoProvider::GetDefaultInstance();
-        if (provider.SetFixedLabels(chip::Span<chip::DeviceLayer::StaticESP32DeviceInfoProvider::FixedLabelEntry>(labels)) != CHIP_NO_ERROR)
-            return ESP_FAIL;
-    }
+    label_endpoints[channel] = esp_matter::endpoint::get_id(endpoint);
     return ESP_OK;
 }
 
