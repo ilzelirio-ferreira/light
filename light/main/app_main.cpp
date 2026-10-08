@@ -19,7 +19,7 @@
 #include <log_heap_numbers.h>
 
 #include <app_priv.h>
-#include "app_display.h"
+#include "app_portal.h"
 #include "app_relay.h"
 #include <app_reset.h>
 #if CHIP_DEVICE_CONFIG_ENABLE_THREAD
@@ -170,7 +170,8 @@ extern "C" void app_main()
     esp_err_t err = ESP_OK;
 
     /* Initialize the ESP NVS layer */
-    nvs_flash_init();
+    ESP_ERROR_CHECK(nvs_flash_init());
+    ESP_ERROR_CHECK(app_portal_load());
 
     MEMORY_PROFILER_DUMP_HEAP_STAT("Bootup");
 
@@ -183,6 +184,8 @@ extern "C" void app_main()
 
     /* Create a Matter node and add the mandatory Root Node device type on endpoint 0 */
     node::config_t node_config;
+    snprintf(node_config.root_node.basic_information.node_label,
+             sizeof(node_config.root_node.basic_information.node_label), "%s", app_portal_module_name());
 
     // node handle can be used to add/modify other endpoints.
     node_t *node = node::create(&node_config, app_attribute_update_cb, app_identification_cb);
@@ -199,6 +202,7 @@ extern "C" void app_main()
         ABORT_APP_ON_FAILURE(relay_endpoint != nullptr, ESP_LOGE(TAG, "Failed to create relay channel %u", channel + 1));
         const uint16_t relay_id = endpoint::get_id(relay_endpoint);
         ESP_ERROR_CHECK(app_relay_register_endpoint(channel, relay_id));
+        ESP_ERROR_CHECK(app_portal_add_channel(relay_endpoint, channel));
         if (channel == 0) light_endpoint_id = relay_id;
     }
 #else
@@ -273,10 +277,7 @@ extern "C" void app_main()
     ESP_ERROR_CHECK(app_driver_light_set_defaults(light_endpoint_id));
 #endif
     ESP_ERROR_CHECK(app_relay_start_switch());
-    err = app_display_init();
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Display initialization failed: %s", esp_err_to_name(err));
-    }
+    ESP_ERROR_CHECK(app_portal_start());
 
 #if CONFIG_ENABLE_ENCRYPTED_OTA
     err = esp_matter_ota_requestor_encrypted_init(s_decryption_key, s_decryption_key_len);

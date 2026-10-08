@@ -39,59 +39,10 @@ available for you to run your application's code.
 
 Applications that do not require BLE post commissioning, can disable it using app_ble_disable() once commissioning is complete.
 
-## ESP32-2432S028R: tela e toque
-
-O suporte fica ativo por padrao no ESP32 (`CONFIG_CYD_DISPLAY=y`). A tela
-ILI9341 exibe LIGADA/DESLIGADA e um botao LIGAR/DESLIGAR. Toda a area de
-toque funciona como esse botao, sem calibracao de coordenadas. Pressione por
-pelo menos 80 ms e solte antes de tocar novamente. Segurar o dedo nao repete
-o comando. Mudancas feitas por um controlador Matter atualizam a tela.
-
-O toque usa `attribute::update` na tarefa do Matter; nao altera diretamente
-a saida. A leitura do estado usa o bloqueio da pilha Matter. Nao requer LVGL
-nem novos componentes externos.
-
-Pinos internos (placa com ILI9341 e XPT2046):
-
-| Funcao | GPIOs |
-| --- | --- |
-| TFT MOSI / MISO / CLK / CS / DC / backlight | 13 / 12 / 14 / 15 / 2 / 21 |
-| Touch MOSI / MISO / CLK / CS / IRQ | 32 / 39 / 25 / 33 / 36 |
-| Saida de teste: LED vermelho, ativo baixo | 4 |
-
-Como a saida da iluminacao externa ainda nao foi definida, este perfil usa
-somente o LED vermelho integrado como demonstracao de liga/desliga. Brilho
-e cor continuam no modelo Matter, mas nao modificam esse LED neste perfil.
-Em `idf.py menuconfig` > Example Configuration, configure `CYD light output
-GPIO` e `CYD light output is active low` para a saida desejada. GPIOs de tela,
-toque, flash e botao BOOT sao rejeitados na compilacao. Desative o suporte
-CYD para voltar ao driver original da placa ESP32 DevKit.
-
-Compile no ambiente ESP-Matter configurado:
-
-```sh
-cd light
-idf.py build
-idf.py -p PORTA_SERIAL flash monitor
-```
-
-Validacao na placa: conferir imagem e estado inicial; tocar para alternar;
-manter pressionado por alguns segundos (uma unica alternancia); soltar e
-tocar novamente; alterar liga/desliga pelo Matter e conferir tela e LED;
-reiniciar e conferir o estado restaurado. A tela permanecer acesa quando a
-luz estiver desligada. Nao ha acao de reset de fabrica pelo toque.
-
-Referencias de hardware e inicializacao:
-- https://esp3d.io/esp3d-tft/version_1x/hardware/esp32/sunton-28-2432/
-- https://github.com/Bodmer/TFT_eSPI/blob/master/TFT_Drivers/ILI9341_Init.h
-
-A integracao ainda requer compilacao com ESP-Matter e teste na placa.
-Os binarios existentes na raiz nao incluem estas alteracoes.
-
 ## ESP32-S2: teste Matter sem tela
 
 O workflow seleciona `esp32s2`. Esse alvo usa o perfil `hollow` do ESP-Matter:
-o display CYD fica desativado. O rele e o interruptor usam GPIOs conforme descrito abaixo. O estado
+o LCD e o toque foram removidos do projeto. O rele e o interruptor usam GPIOs conforme descrito abaixo. O estado
 da luz e seus atributos podem ser controlados pelo Matter e consultados pelo
 console serial.
 
@@ -100,7 +51,7 @@ console serial e use um controlador com comissionamento Matter na rede IP
 (on-network). O pareamento inicial por Bluetooth nao funciona nesse alvo.
 
 O firmware ESP32-S2 deve ser gravado somente na nova placa ESP32-S2.
-A ESP32-2432S028R continua sendo alvo `esp32`.
+O firmware de seis canais e o portal destinam-se a ESP32-S2.
 
 ## Seis interruptores e reles na ESP32-S2
 
@@ -159,3 +110,50 @@ Nao ligue bobinas diretamente aos GPIOs e nunca aplique rede eletrica neles.
 Validacao na placa: acionar cada interruptor nos dois sentidos e confirmar
 somente seu rele; controlar cada endpoint pelo Matter; testar mudancas
 simultaneas, pulsos com ruido e reinicializacao com restauracao de estados.
+
+## Portal Wi-Fi, nomes e OTA web (ESP32-S2)
+
+Depois de 30 segundos sem conexao Wi-Fi, aparece a rede `Light-XXXXXX`.
+Conecte usando a senha inicial `configurar123`; o portal captive deve abrir.
+Se nao abrir automaticamente, acesse http://192.168.4.1/ no navegador.
+Entre no painel com a mesma senha. Configure uma rede de 2,4 GHz, o nome
+do modulo e os nomes dos seis canais. Os canais aceitam ate 16 bytes
+(Matter Fixed Label); o modulo aceita ate 32 bytes (Matter NodeLabel).
+Letras acentuadas podem ocupar mais de um byte. Os nomes iniciais sao
+`Light 6 canais` e `Luz 1` a `Luz 6`.
+
+O painel permite mudar sua senha (8 a 63 caracteres ASCII), que tambem
+protege a rede de configuracao. Depois de salvar, a placa reinicia.
+Deixar a senha Wi-Fi vazia mantem a senha da mesma rede; para trocar
+para uma rede aberta, marque explicitamente `A nova rede nao tem senha`.
+Os nomes e a senha de acesso ficam na NVS; a rede e a senha Wi-Fi ficam
+no armazenamento Wi-Fi da ESP-IDF. Nenhuma senha e devolvida pela API.
+
+Quando conectada, abra http://IP_DA_PLACA/ para configurar ou atualizar.
+A rede de configuracao e desativada apos 30 segundos online e sem clientes;
+ela reaparece se o Wi-Fi permanecer desconectado por 30 segundos.
+Os controles Matter e as entradas de 60 Hz continuam funcionando.
+Os nomes sao expostos no Matter, mas Alexa/Google/Home Assistant podem
+manter nomes locais e exigir renomeacao no aplicativo.
+
+Na secao `Atualizar firmware`, envie somente `light.bin` do artifact
+`light-firmware` do GitHub. Nao envie bootloader, tabela de particoes ou
+uma imagem completa mesclada. A API recebe o binario bruto em POST
+`/api/ota` com cabecalho `X-Portal-Key` e Content-Type
+`application/octet-stream`. A imagem deve ser do projeto `light`, alvo
+ESP32-S2, e caber na particao de 0x1E0000 bytes (1.875 MiB).
+O boot slot so muda depois de validar a imagem inteira. Upload incompleto
+ou firmware invalido preserva a versao atual. Uma atualizacao que falhe
+antes de concluir a inicializacao usa rollback do bootloader.
+No perfil ESP32-S2, o OTA web substitui o requestor OTA Matter para evitar
+atualizacoes concorrentes na mesma particao.
+
+A primeira instalacao desta versao precisa ser pela serial, pois o firmware
+anterior nao possui servidor web e o bootloader precisa habilitar rollback.
+As proximas atualizacoes podem ser pela pagina. O painel usa HTTP na rede
+local e exige senha para ler configuracoes, salvar ou atualizar.
+
+Validacao na placa: configurar uma rede valida e uma senha errada (portal
+reaparece); conferir os sete nomes depois de reiniciar; parear/controlar
+os seis endpoints Matter; atualizar um light.bin valido; rejeitar arquivo
+invalido, de outra placa e upload interrompido sem trocar o boot slot.

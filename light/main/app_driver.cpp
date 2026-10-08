@@ -21,16 +21,6 @@
 #include "sdkconfig.h"
 #include "app_relay.h"
 
-#if CONFIG_CYD_DISPLAY
-static esp_err_t cyd_set_power(bool on)
-{
-#if CONFIG_CYD_LIGHT_ACTIVE_LOW
-    on = !on;
-#endif
-    return gpio_set_level(static_cast<gpio_num_t>(CONFIG_CYD_LIGHT_GPIO), on);
-}
-#endif
-
 using namespace chip::app::Clusters;
 using namespace chip::app::Clusters::ColorControl::Attributes;
 using namespace esp_matter;
@@ -38,7 +28,7 @@ using namespace esp_matter;
 static const char *TAG = "app_driver";
 extern uint16_t light_endpoint_id;
 
-#if !CONFIG_CYD_DISPLAY && !CONFIG_IDF_TARGET_ESP32S2
+#if !CONFIG_IDF_TARGET_ESP32S2
 // Global variables to store current XY color coordinates
 static uint16_t current_x = 0;
 static uint16_t current_y = 0;
@@ -148,13 +138,7 @@ static void app_driver_button_toggle_cb(void *arg, void *data)
 esp_err_t app_driver_attribute_update(app_driver_handle_t driver_handle, uint16_t endpoint_id, uint32_t cluster_id,
                                       uint32_t attribute_id, esp_matter_attr_val_t *val)
 {
-#if CONFIG_CYD_DISPLAY
-    if (endpoint_id == light_endpoint_id && cluster_id == OnOff::Id &&
-        attribute_id == OnOff::Attributes::OnOff::Id) {
-        return cyd_set_power(val->val.b);
-    }
-    return ESP_OK;
-#elif CONFIG_IDF_TARGET_ESP32S2
+#if CONFIG_IDF_TARGET_ESP32S2
     if (app_relay_has_endpoint(endpoint_id) && cluster_id == OnOff::Id &&
         attribute_id == OnOff::Attributes::OnOff::Id) {
         return app_relay_set_power(endpoint_id, val->val.b);
@@ -199,11 +183,7 @@ esp_err_t app_driver_attribute_update(app_driver_handle_t driver_handle, uint16_
 esp_err_t app_driver_light_set_defaults(uint16_t endpoint_id)
 {
     esp_err_t err = ESP_OK;
-#if CONFIG_CYD_DISPLAY
-    esp_matter_attr_val_t power = {};
-    err = attribute::get_val(endpoint_id, OnOff::Id, OnOff::Attributes::OnOff::Id, &power);
-    return err == ESP_OK ? cyd_set_power(power.val.b) : err;
-#elif CONFIG_IDF_TARGET_ESP32S2
+#if CONFIG_IDF_TARGET_ESP32S2
     esp_matter_attr_val_t power = {};
     err = attribute::get_val(endpoint_id, OnOff::Id, OnOff::Attributes::OnOff::Id, &power);
     return err == ESP_OK ? app_relay_set_power(endpoint_id, power.val.b) : err;
@@ -233,20 +213,7 @@ esp_err_t app_driver_light_set_defaults(uint16_t endpoint_id)
 
 app_driver_handle_t app_driver_light_init()
 {
-#if CONFIG_CYD_DISPLAY
-    constexpr int pin = CONFIG_CYD_LIGHT_GPIO;
-    static_assert(GPIO_IS_VALID_OUTPUT_GPIO(pin), "CYD light GPIO is not an output pin");
-    static_assert(pin != 0 && pin != 2 && pin != 12 && pin != 13 && pin != 14 && pin != 15 &&
-                  pin != 21 && pin != 25 && pin != 32 && pin != 33 && !(pin >= 6 && pin <= 11),
-                  "CYD light GPIO conflicts with display, touch, flash or boot button");
-    gpio_config_t output = {};
-    output.pin_bit_mask = 1ULL << pin;
-    output.mode = GPIO_MODE_OUTPUT;
-    ESP_ERROR_CHECK(gpio_config(&output));
-    ESP_ERROR_CHECK(cyd_set_power(false));
-    static int cyd_handle;
-    return &cyd_handle;
-#elif CONFIG_IDF_TARGET_ESP32S2
+#if CONFIG_IDF_TARGET_ESP32S2
     ESP_ERROR_CHECK(app_relay_init());
     static int relay_handle;
     return &relay_handle;

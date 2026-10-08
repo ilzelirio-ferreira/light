@@ -1,34 +1,12 @@
 menu "Example Configuration"
 
-    config CYD_DISPLAY
-        bool "ESP32-2432S028R display and touch button"
-        depends on IDF_TARGET_ESP32
-        default y
-        help
-            ILI9341 TFT and XPT2046 resistive touch. Touch anywhere to
-            toggle the Matter light. Uses the onboard red LED as output.
-
-    config CYD_LIGHT_GPIO
-        int "CYD light output GPIO"
-        depends on CYD_DISPLAY
-        range 0 33
-        default 4
-        help
-            Default 4 is the onboard red LED. Display, touch, flash and
-            boot button pins are rejected at compile time.
-
-    config CYD_LIGHT_ACTIVE_LOW
-        bool "CYD light output is active low"
-        depends on CYD_DISPLAY
-        default y
-
     config RELAY_ACTIVE_LOW
         bool "Relay outputs are active low (ESP32-S2)"
         depends on IDF_TARGET_ESP32S2
         default y
         help
             Enabled: LOW turns the relay on. Disabled: HIGH turns it on.
-            Inputs are dry-contact wall switches to GND with internal pull-up.
+            Inputs detect 60 Hz through PC817 optocouplers with internal pull-up.
 
     config ENABLE_MEMORY_PROFILING
         bool "Enable Memory Profiling"
