@@ -491,13 +491,20 @@ static void dns_task(void *)
 
 esp_err_t app_portal_start()
 {
-    // NodeLabel may have been restored by Matter; the portal is its source of truth.
+    ESP_LOGI(TAG, "Starting web configuration");
+    // attribute::update takes the Matter lock itself. Holding StackLock here
+    // would deadlock on SDK builds without recursive lock tracking.
     {
-        chip::DeviceLayer::StackLock lock;
         using namespace chip::app::Clusters;
         esp_matter_attr_val_t value = esp_matter_char_str(config.module, strlen(config.module));
         ESP_RETURN_ON_ERROR(esp_matter::attribute::update(0, BasicInformation::Id,
                             BasicInformation::Attributes::NodeLabel::Id, &value), TAG, "module name");
+    }
+    // A previously stored APSTA mode can expose the driver's default open AP.
+    // Keep only the station until the offline recovery task enables our AP.
+    {
+        chip::DeviceLayer::StackLock lock;
+        ESP_RETURN_ON_ERROR(esp_wifi_set_mode(WIFI_MODE_STA), TAG, "initial Wi-Fi mode");
     }
     esp_timer_create_args_t timer = {};
     timer.callback = [](void *) { esp_restart(); };
