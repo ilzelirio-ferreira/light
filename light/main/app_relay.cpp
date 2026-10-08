@@ -1,4 +1,5 @@
 #include "app_relay.h"
+#include "app_ac_input.h"
 #include "sdkconfig.h"
 #if CONFIG_IDF_TARGET_ESP32S2
 #include <driver/gpio.h>
@@ -24,18 +25,7 @@ static Channel channels[APP_RELAY_CHANNEL_COUNT] = {
     {GPIO_NUM_16, GPIO_NUM_17, 0},
 };
 static std::atomic<bool> pending[APP_RELAY_CHANNEL_COUNT]{};
-// One falling edge per mains cycle with a half-wave PC817 circuit.
-static constexpr uint32_t MIN_PERIOD_US = 14000;
-static constexpr uint32_t MAX_PERIOD_US = 19000;
-static constexpr uint32_t ABSENCE_US = 100000;
-struct PulseState {
-    int64_t edge_us;
-    int64_t valid_us;
-    unsigned consecutive;
-    bool seen;
-    bool qualified;
-};
-static PulseState pulses[APP_RELAY_CHANNEL_COUNT]{};
+static AcPulseDetector pulses[APP_RELAY_CHANNEL_COUNT]{};
 static portMUX_TYPE pulse_lock = portMUX_INITIALIZER_UNLOCKED;
 
 static void pulse_isr(void *arg)
@@ -43,29 +33,17 @@ static void pulse_isr(void *arg)
     const unsigned channel = static_cast<unsigned>(reinterpret_cast<uintptr_t>(arg));
     const int64_t now = esp_timer_get_time();
     portENTER_CRITICAL_ISR(&pulse_lock);
-    auto &pulse = pulses[channel];
-    const int64_t period = now - pulse.edge_us;
-    if (pulse.seen && period >= MIN_PERIOD_US && period <= MAX_PERIOD_US) {
-        if (pulse.consecutive < 4) ++pulse.consecutive;
-    } else {
-        pulse.consecutive = 0;
-    }
-    pulse.edge_us = now;
-    pulse.seen = true;
-    if (pulse.consecutive >= 4) {
-        pulse.valid_us = now;
-        pulse.qualified = true;
-    }
+    pulses[channel].edge(now);
     portEXIT_CRITICAL_ISR(&pulse_lock);
 }
 
 static bool signal_present(unsigned channel)
 {
     portENTER_CRITICAL(&pulse_lock);
-    const PulseState pulse = pulses[channel];
+    const AcPulseDetector pulse = pulses[channel];
     portEXIT_CRITICAL(&pulse_lock);
     const int64_t now = esp_timer_get_time();
-    return pulse.qualified && (now - pulse.valid_us) < ABSENCE_US;
+    return pulse.present(now);
 }
 
 static esp_err_t set_channel_power(unsigned channel, bool on)
@@ -146,17 +124,17 @@ static void toggle(intptr_t channel)
 
 static void switch_task(void *)
 {
-    bool stable[APP_RELAY_CHANNEL_COUNT];
+    AcTransitionFilter filters[APP_RELAY_CHANNEL_COUNT];
     // Establish the initial AC state without changing restored Matter states.
-    vTaskDelay(pdMS_TO_TICKS(200));
+    vTaskDelay(pdMS_TO_TICKS(750));
     for (unsigned i = 0; i < APP_RELAY_CHANNEL_COUNT; ++i)
-        stable[i] = signal_present(i);
+        filters[i].initialize(signal_present(i), esp_timer_get_time());
     while (true) {
         for (unsigned i = 0; i < APP_RELAY_CHANNEL_COUNT; ++i) {
             const bool present = signal_present(i);
-            if (present != stable[i] && !pending[i].exchange(true)) {
+            if (filters[i].ready(present, esp_timer_get_time()) && !pending[i].exchange(true)) {
                 if (chip::DeviceLayer::PlatformMgr().ScheduleWork(toggle, i) == CHIP_NO_ERROR) {
-                    stable[i] = present;
+                    filters[i].accept();
                     ESP_LOGI(TAG, "Channel %u: 60 Hz %s", i + 1, present ? "present" : "absent");
                 } else {
                     pending[i].store(false);

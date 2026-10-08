@@ -15,6 +15,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Test AC input filter
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror light/tests/ac_input_test.cpp -o /tmp/ac_input_test
+          /tmp/ac_input_test
+
       - name: Pull ESP-Matter Docker image
         run: docker pull espressif/esp-matter:latest
 

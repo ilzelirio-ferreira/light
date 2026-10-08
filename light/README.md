@@ -121,15 +121,19 @@ O pull-up interno fica habilitado; recomenda-se pull-up externo de 10 kohms.
 GPIO 2 e GPIO 4 deixam de ser usados; GPIO 19/20 ficam para USB nativo.
 
 A entrada detecta pulsos ativos em LOW de meia onda a 60 Hz, com periodos
-entre 14 e 19 ms. Quatro periodos consecutivos validos confirmam presenca;
-100 ms sem pulsos validos confirmam ausencia. Um nivel LOW constante nao
+entre 14 e 19 ms, tolerando ate dois ciclos perdidos. Bordas espurias com
+menos de 2 ms sao ignoradas. Quatro periodos validos qualificam o sinal;
+500 ms sem pulsos validos indicam ausencia. Uma mudanca entre presenca
+e ausencia precisa permanecer estavel por mais 200 ms antes de alternar
+o rele (aproximadamente 700 ms para reconhecer a retirada da rede).
+Um nivel LOW constante nao
 conta como presenca. Retificacao de onda completa (120 Hz) nao e suportada
 por esta configuracao. Interrupcoes capturam os pulsos independentemente
 da tarefa de controle.
 
 Cada transicao entre presenca e ausencia inverte somente o rele correspondente.
 O sinal mantido nao repete comandos nem impede comandos pelo Matter.
-A leitura inicial, apos 200 ms, nao altera os estados Matter restaurados.
+A leitura inicial, apos 750 ms, nao altera os estados Matter restaurados.
 Os comandos passam pela tarefa Matter.
 
 O circuito de rede de 127 V precisa de protecao reversa para o LED do PC817
