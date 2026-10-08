@@ -343,8 +343,10 @@ static esp_err_t set_ap(bool enabled)
 {
     chip::DeviceLayer::StackLock lock;
     auto &connectivity = chip::DeviceLayer::ConnectivityMgr();
-    if (connectivity.GetWiFiAPMode() != chip::DeviceLayer::ConnectivityManager::kWiFiAPMode_NotSupported)
-        connectivity.SetWiFiAPMode(chip::DeviceLayer::ConnectivityManager::kWiFiAPMode_ApplicationControlled);
+    if (connectivity.GetWiFiAPMode() != chip::DeviceLayer::ConnectivityManager::kWiFiAPMode_NotSupported) {
+        if (connectivity.SetWiFiAPMode(chip::DeviceLayer::ConnectivityManager::kWiFiAPMode_ApplicationControlled) != CHIP_NO_ERROR)
+            return ESP_FAIL;
+    }
     if (enabled) {
         if (!ap_netif) {
             ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");

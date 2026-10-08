@@ -21,6 +21,7 @@ int main() {
     CHECK(!portal_key_matches("1234567",7,shortened));
     CHECK(!portal_key_matches("12345679",8,shortened));
     CHECK(!portal_key_matches("",0,shortened));
+    CHECK(!portal_key_matches("1234567890123456",16,"12345678"));
     const uint8_t ip[4] = {192,168,4,1};
     uint8_t query[64] = {0x12,0x34,1,0,0,1,0,0,0,0,0,0,3,'a','b','c',0,0,1,0,1};
     uint8_t packet[64];

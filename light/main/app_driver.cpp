@@ -120,6 +120,7 @@ static esp_err_t app_driver_light_apply_color_mode(led_driver_handle_t handle, u
 
 #endif
 
+#if !CONFIG_IDF_TARGET_ESP32S2
 static void app_driver_button_toggle_cb(void *arg, void *data)
 {
     ESP_LOGI(TAG, "Toggle button pressed");
@@ -134,6 +135,8 @@ static void app_driver_button_toggle_cb(void *arg, void *data)
     val.val.b = !val.val.b;
     attribute::update(endpoint_id, cluster_id, attribute_id, &val);
 }
+
+#endif
 
 esp_err_t app_driver_attribute_update(app_driver_handle_t driver_handle, uint16_t endpoint_id, uint32_t cluster_id,
                                       uint32_t attribute_id, esp_matter_attr_val_t *val)

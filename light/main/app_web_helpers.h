@@ -39,9 +39,10 @@ inline bool portal_key(const char *s) {
 
 inline bool portal_key_matches(const char *provided, size_t length, const char *expected) {
     if (!provided || !expected || length == 0 || length > 63) return false;
-    unsigned diff = length ^ strlen(expected);
+    const size_t expected_length = strlen(expected);
+    unsigned diff = length ^ expected_length;
     for (size_t i = 0; i < length; ++i)
-        diff |= static_cast<unsigned char>(provided[i] ^ expected[i]);
+        diff |= static_cast<unsigned char>(provided[i] ^ (i < expected_length ? expected[i] : 0));
     return diff == 0;
 }
 
