@@ -66,7 +66,7 @@ Cada canal e um endpoint Matter On/Off independente, na ordem abaixo:
 | 5 | GPIO 18 | GPIO 21 |
 | 6 | GPIO 16 | GPIO 17 |
 
-As saidas sao ativas em LOW. Cada entrada recebe o coletor (pino 4) de
+As seis saidas sao ativas em HIGH para acionar MOC3023: HIGH liga e LOW desliga. Cada entrada recebe o coletor (pino 4) de
 um PC817, com emissor (pino 3) ao GND do ESP32 e pull-up para 3,3 V.
 As seis entradas usam o pull-up interno habilitado no GPIO.
 GPIO 2 e GPIO 4 deixam de ser usados; GPIO 19/20 ficam para USB nativo.
