@@ -416,9 +416,20 @@ static esp_err_t set_ap(bool enabled)
         snprintf(reinterpret_cast<char *>(ap.ap.password), sizeof(ap.ap.password), "%s", config.key);
         ap.ap.authmode = WIFI_AUTH_WPA2_PSK;
         ap.ap.max_connection = 2;
-        ESP_RETURN_ON_ERROR(esp_wifi_set_mode(WIFI_MODE_APSTA), TAG, "AP mode");
-        ESP_RETURN_ON_ERROR(esp_wifi_set_config(WIFI_IF_AP, &ap), TAG, "AP config");
-        ESP_RETURN_ON_ERROR(esp_wifi_start(), TAG, "AP start");
+        // Stop scans/reconnects before enabling APSTA; otherwise the driver
+        // can advertise its open default AP before accepting our configuration.
+        ESP_RETURN_ON_ERROR(esp_wifi_stop(), TAG, "AP prepare");
+        esp_err_t err = esp_wifi_set_mode(WIFI_MODE_APSTA);
+        if (err == ESP_OK) err = esp_wifi_set_config(WIFI_IF_AP, &ap);
+        if (err == ESP_OK) err = esp_wifi_start();
+        if (err != ESP_OK) {
+            // Do not leave an unconfigured open AP running after a failure.
+            esp_err_t restore = esp_wifi_set_mode(WIFI_MODE_STA);
+            if (restore == ESP_OK) restore = esp_wifi_start();
+            if (restore != ESP_OK) ESP_LOGE(TAG, "Wi-Fi recovery failed: %s", esp_err_to_name(restore));
+            ESP_LOGE(TAG, "AP configuration failed: %s", esp_err_to_name(err));
+            return err;
+        }
     } else {
         ESP_RETURN_ON_ERROR(esp_wifi_set_mode(WIFI_MODE_STA), TAG, "AP stop");
     }
