@@ -19,7 +19,7 @@ class XHR {
   setRequestHeader(key, value) { this.headers[key] = value; }
   send(body) { this.body = body; }
 }
-const config = {module: 'Modulo <script>', ssid: 'Rede "teste"', names: ['Luz <1>','Luz 2','Luz 3','Luz 4','Luz 5','Luz 6'], version:'1.0', ip:'192.168.15.5'};
+const config = {module: 'Modulo <script>', ssid: 'Rede "teste"', names: ['Luz <1>','Luz 2','Luz 3','Luz 4','Luz 5','Luz 6'], inputs:[34,36,38,40,17,21],version:'1.0', ip:'192.168.15.5'};
 let lastFetch, unauthorized = false;
 const context = vm.createContext({
   document: {getElementById: id => elements.get(id), createElement: () => new Element(), querySelectorAll: () => [elements.get('enter'),elements.get('upload')]},
@@ -44,9 +44,16 @@ const get = id => elements.get(id);
   const saved = JSON.parse(lastFetch.options.body);
   assert.equal(saved.ssid, config.ssid);
   assert.equal(saved.names.length, 6);
+  assert.deepEqual(saved.inputs, config.inputs);
   assert.equal(saved.password, '');
   assert.equal(lastFetch.options.headers['Content-Type'], 'application/json');
   assert.equal(get('saveStatus').textContent, 'Salvo');
+  get('input0').value = get('input1').value;
+  const previousFetch = lastFetch;
+  await get('settings').onsubmit({preventDefault(){}});
+  assert.equal(lastFetch, previousFetch);
+  assert.match(get('saveStatus').textContent, /GPIO diferente/);
+  get('input0').value = config.inputs[0];
   get('upload').onclick();
   assert.equal(get('otaStatus').textContent, 'Selecione o light.bin.');
   const file = {name:'light.bin', size:1234}; get('firmware').files = [file];

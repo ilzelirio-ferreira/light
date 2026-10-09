@@ -1,4 +1,13 @@
 #include "../main/app_ac_input.h"
+#include "../main/app_input_map.h"
+constexpr uint8_t duplicate_inputs[6] = {34,36,38,40,17,17};
+constexpr uint8_t output_as_input[6] = {39,36,38,40,17,21};
+constexpr uint8_t custom_inputs[6] = {17,21,34,36,38,40};
+static_assert(app_input_map_valid(APP_DEFAULT_INPUTS), "Default mapping must be valid");
+static_assert(app_input_map_valid(custom_inputs), "Valid permutations must be accepted");
+static_assert(!app_input_map_valid(duplicate_inputs), "Duplicate GPIOs must be rejected");
+static_assert(!app_input_map_valid(output_as_input), "Output GPIOs cannot be inputs");
+static_assert(!app_input_map_valid(nullptr), "Null mapping must be rejected");
 
 constexpr bool frequency(int64_t period) {
     AcPulseDetector d;

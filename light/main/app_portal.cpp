@@ -1,5 +1,7 @@
 #include "app_portal.h"
 #include "app_relay.h"
+#include "app_input_map.h"
+#include <stddef.h>
 #include "app_web_helpers.h"
 #include "app_portal_ui.h"
 #include "sdkconfig.h"
@@ -34,6 +36,7 @@ struct PortalConfig {
     char module[33];
     char names[APP_RELAY_CHANNEL_COUNT][17];
     char key[64];
+    uint8_t inputs[APP_RELAY_CHANNEL_COUNT];
 };
 static PortalConfig config;
 static uint16_t label_endpoints[APP_RELAY_CHANNEL_COUNT]{};
@@ -109,7 +112,8 @@ static esp_err_t store_config(const PortalConfig &value)
 esp_err_t app_portal_load()
 {
     config = {};
-    config.version = 1;
+    config.version = 2;
+    memcpy(config.inputs, APP_DEFAULT_INPUTS, sizeof(config.inputs));
     snprintf(config.module, sizeof(config.module), "Light 6 canais");
     snprintf(config.key, sizeof(config.key), "configurar123");
     for (unsigned i = 0; i < APP_RELAY_CHANNEL_COUNT; ++i)
@@ -122,7 +126,13 @@ esp_err_t app_portal_load()
         err = nvs_get_blob(nvs, "config", &saved, &size);
         nvs_close(nvs);
         // Never use unterminated strings from a damaged or older NVS blob.
-        bool valid = err == ESP_OK && size == sizeof(saved) && saved.version == 1;
+        bool legacy = err == ESP_OK && size == ((offsetof(PortalConfig, inputs) + alignof(PortalConfig) - 1) / alignof(PortalConfig)) * alignof(PortalConfig) && saved.version == 1;
+        if (legacy) {
+            saved.version = 2;
+            memcpy(saved.inputs, APP_DEFAULT_INPUTS, sizeof(saved.inputs));
+        }
+        bool valid = err == ESP_OK && (legacy || (size == sizeof(saved) && saved.version == 2))
+                     && app_input_map_valid(saved.inputs);
         valid = valid && memchr(saved.module, 0, sizeof(saved.module)) && memchr(saved.key, 0, sizeof(saved.key));
         for (const auto &name : saved.names) valid = valid && memchr(name, 0, sizeof(name));
         if (valid) {
@@ -132,6 +142,7 @@ esp_err_t app_portal_load()
         if (valid) config = saved;
         else if (err != ESP_ERR_NVS_NOT_FOUND) ESP_LOGW(TAG, "Invalid portal config; using setup defaults");
     } else if (err != ESP_ERR_NVS_NOT_FOUND) return err;
+    ESP_RETURN_ON_ERROR(app_relay_configure_inputs(config.inputs), TAG, "input mapping");
     esp_matter::set_custom_device_info_provider(&name_provider);
     return ESP_OK;
 }
@@ -222,6 +233,12 @@ static esp_err_t config_get(httpd_req_t *req)
     cJSON_AddStringToObject(json, "ip", ip);
     cJSON *names = cJSON_AddArrayToObject(json, "names");
     for (const auto &name : config.names) cJSON_AddItemToArray(names, cJSON_CreateString(name));
+    cJSON *inputs = cJSON_AddArrayToObject(json, "inputs");
+    cJSON *outputs = cJSON_AddArrayToObject(json, "outputs");
+    for (unsigned i=0;i<APP_RELAY_CHANNEL_COUNT;++i) {
+        cJSON_AddItemToArray(inputs, cJSON_CreateNumber(config.inputs[i]));
+        cJSON_AddItemToArray(outputs, cJSON_CreateNumber(APP_OUTPUT_PINS[i]));
+    }
     return json_reply(req, json);
 }
 
@@ -277,6 +294,22 @@ static esp_err_t config_post(httpd_req_t *req)
             snprintf(next.names[i], sizeof(next.names[i]), "%s", name->valuestring);
         }
         if (new_key[0]) snprintf(next.key, sizeof(next.key), "%s", new_key);
+    }
+    cJSON *inputs = cJSON_GetObjectItemCaseSensitive(json, "inputs");
+    if (valid && inputs) {
+        valid = cJSON_IsArray(inputs) && cJSON_GetArraySize(inputs) == static_cast<int>(APP_RELAY_CHANNEL_COUNT);
+        for (unsigned i=0;valid && i<APP_RELAY_CHANNEL_COUNT;++i) {
+            auto *pin = cJSON_GetArrayItem(inputs, i);
+            valid = cJSON_IsNumber(pin) && pin->valuedouble >= 0 && pin->valuedouble <= 40
+                    && pin->valuedouble == pin->valueint;
+            if (valid) next.inputs[i] = static_cast<uint8_t>(pin->valueint);
+        }
+        valid = valid && app_input_map_valid(next.inputs);
+        if (!valid) {
+            cJSON_Delete(json);
+            changing.store(false);
+            return reply(req, "400 Bad Request", "Entradas: use GPIO 17, 21, 34, 36, 38 e 40, sem repetir.");
+        }
     }
     wifi_config_t previous_wifi = {}, next_wifi = {};
     esp_err_t err = esp_wifi_get_config(WIFI_IF_STA, &previous_wifi);

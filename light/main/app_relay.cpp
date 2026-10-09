@@ -1,5 +1,6 @@
 #include "app_relay.h"
 #include "app_ac_input.h"
+#include "app_input_map.h"
 #include "sdkconfig.h"
 #if CONFIG_IDF_TARGET_ESP32S2
 #include <driver/gpio.h>
@@ -18,11 +19,11 @@ struct Channel {
 };
 static Channel channels[APP_RELAY_CHANNEL_COUNT] = {
     {GPIO_NUM_39, GPIO_NUM_34, 0},
-    {GPIO_NUM_37, GPIO_NUM_21, 0},
-    {GPIO_NUM_35, GPIO_NUM_17, 0},
+    {GPIO_NUM_37, GPIO_NUM_36, 0},
+    {GPIO_NUM_35, GPIO_NUM_38, 0},
     {GPIO_NUM_33, GPIO_NUM_40, 0},
-    {GPIO_NUM_18, GPIO_NUM_38, 0},
-    {GPIO_NUM_16, GPIO_NUM_36, 0},
+    {GPIO_NUM_18, GPIO_NUM_17, 0},
+    {GPIO_NUM_16, GPIO_NUM_21, 0},
 };
 static std::atomic<bool> pending[APP_RELAY_CHANNEL_COUNT]{};
 static AcPulseDetector pulses[APP_RELAY_CHANNEL_COUNT]{};
@@ -87,6 +88,12 @@ esp_err_t app_relay_set_power(uint16_t endpoint_id, bool on)
     return ESP_ERR_NOT_FOUND;
 }
 
+esp_err_t app_relay_configure_inputs(const uint8_t *pins)
+{
+    if (!app_input_map_valid(pins)) return ESP_ERR_INVALID_ARG;
+    for (unsigned i=0;i<APP_RELAY_CHANNEL_COUNT;++i) channels[i].input = static_cast<gpio_num_t>(pins[i]);
+    return ESP_OK;
+}
 esp_err_t app_relay_init()
 {
     gpio_config_t output = {};
@@ -160,6 +167,7 @@ esp_err_t app_relay_start_switch()
                ? ESP_OK : ESP_ERR_NO_MEM;
 }
 #else
+esp_err_t app_relay_configure_inputs(const uint8_t *) { return ESP_ERR_NOT_SUPPORTED; }
 esp_err_t app_relay_init() { return ESP_OK; }
 esp_err_t app_relay_register_endpoint(unsigned, uint16_t) { return ESP_ERR_NOT_SUPPORTED; }
 uint16_t app_relay_endpoint(unsigned) { return 0; }

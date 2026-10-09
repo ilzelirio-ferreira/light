@@ -60,11 +60,11 @@ Cada canal e um endpoint Matter On/Off independente, na ordem abaixo:
 | Canal | Saida do rele (S) | Entrada do interruptor (E) |
 | --- | --- | --- |
 | 1 | GPIO 39 | GPIO 34 |
-| 2 | GPIO 37 | GPIO 21 |
-| 3 | GPIO 35 | GPIO 17 |
+| 2 | GPIO 37 | GPIO 36 |
+| 3 | GPIO 35 | GPIO 38 |
 | 4 | GPIO 33 | GPIO 40 |
-| 5 | GPIO 18 | GPIO 38 |
-| 6 | GPIO 16 | GPIO 36 |
+| 5 | GPIO 18 | GPIO 17 |
+| 6 | GPIO 16 | GPIO 21 |
 
 As seis saidas sao ativas em HIGH para acionar MOC3023: HIGH liga e LOW desliga. Cada entrada recebe o coletor (pino 4) de
 um PC817, com emissor (pino 3) ao GND do ESP32 e pull-up para 3,3 V.
@@ -158,3 +158,5 @@ Validacao na placa: configurar uma rede valida e uma senha errada (portal
 reaparece); conferir os sete nomes depois de reiniciar; parear/controlar
 os seis endpoints Matter; atualizar um light.bin valido; rejeitar arquivo
 invalido, de outra placa e upload interrompido sem trocar o boot slot.
+
+No portal, cada canal permite escolher seu GPIO de entrada entre 17, 21, 34, 36, 38 e 40, sem repetir. As saidas ficam fixas. Salvar persiste a escolha e reinicia para aplicar. Configuracoes antigas de Wi-Fi, nomes e senha sao preservadas ao migrar.
