@@ -74,7 +74,8 @@ GPIO 2 e GPIO 4 deixam de ser usados; GPIO 19/20 ficam para USB nativo.
 A entrada detecta pulsos ativos em LOW de meia onda a 60 Hz, com periodos
 entre 14 e 19 ms, tolerando ate dois ciclos perdidos. Bordas espurias com
 menos de 2 ms sao ignoradas. Quatro periodos validos qualificam o sinal;
-500 ms sem pulsos validos indicam ausencia. Uma mudanca entre presenca
+Apos qualificar 60 Hz, periodos irregulares nao removem a presenca;
+500 ms sem atividade de pulsos indicam ausencia. Uma mudanca entre presenca
 e ausencia precisa permanecer estavel por mais 200 ms antes de alternar
 o rele (aproximadamente 700 ms para reconhecer a retirada da rede).
 Um nivel LOW constante nao

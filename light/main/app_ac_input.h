@@ -14,6 +14,11 @@ struct AcPulseDetector {
         const int64_t period = now - edge_us;
         // Ignore short contact/noise edges without moving the cycle reference.
         if (seen && period < 2000) return;
+        // A real pulse gap ends qualification; later activity must qualify again.
+        if (seen && period >= absence_us) {
+            qualified = false;
+            consecutive = 0;
+        }
         bool valid = false;
         // Accept up to two missing cycles, but do not accept steady 50/120 Hz.
         for (unsigned cycles = 1; cycles <= 3; ++cycles)
@@ -29,7 +34,9 @@ struct AcPulseDetector {
     }
 
     constexpr bool present(int64_t now) const {
-        return qualified && now - valid_us < absence_us;
+        // Once 60 Hz is confirmed, irregular edges must not invent a loss.
+        // Require a real gap in pulse activity before reporting absence.
+        return qualified && now - edge_us < absence_us;
     }
 };
 

@@ -75,4 +75,20 @@ constexpr bool integrated() {
     return toggles == 2 && f.stable;
 }
 static_assert(integrated(), "No flashing on noisy mains; one toggle on removal and return");
+constexpr bool disturbed_live_input() {
+    AcPulseDetector d;
+    for (int i = 0; i < 12; ++i) d.edge(i * 16667LL);
+    // Repeated interference 6 ms after each mains edge breaks period tracking,
+    // but an energized input must remain present, with no false transitions.
+    for (int i = 12; i < 120; ++i) {
+        d.edge(i * 16667LL);
+        d.edge(i * 16667LL + 6000);
+        if (!d.present(i * 16667LL + 10000)) return false;
+    }
+    const int64_t last = 119 * 16667LL + 6000;
+    if (d.present(last + 500000)) return false;
+    d.edge(last + 600000);
+    return !d.present(last + 600001); // A stray edge cannot restore qualification.
+}
+static_assert(disturbed_live_input(), "Continuous noisy AC must not flash outputs; real silence must expire");
 int main() { return 0; }
