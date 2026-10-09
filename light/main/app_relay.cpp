@@ -17,12 +17,12 @@ struct Channel {
     uint16_t endpoint;
 };
 static Channel channels[APP_RELAY_CHANNEL_COUNT] = {
-    {GPIO_NUM_39, GPIO_NUM_40, 0},
-    {GPIO_NUM_37, GPIO_NUM_38, 0},
-    {GPIO_NUM_35, GPIO_NUM_36, 0},
-    {GPIO_NUM_33, GPIO_NUM_34, 0},
-    {GPIO_NUM_18, GPIO_NUM_21, 0},
-    {GPIO_NUM_16, GPIO_NUM_17, 0},
+    {GPIO_NUM_39, GPIO_NUM_34, 0},
+    {GPIO_NUM_37, GPIO_NUM_21, 0},
+    {GPIO_NUM_35, GPIO_NUM_17, 0},
+    {GPIO_NUM_33, GPIO_NUM_40, 0},
+    {GPIO_NUM_18, GPIO_NUM_38, 0},
+    {GPIO_NUM_16, GPIO_NUM_36, 0},
 };
 static std::atomic<bool> pending[APP_RELAY_CHANNEL_COUNT]{};
 static AcPulseDetector pulses[APP_RELAY_CHANNEL_COUNT]{};

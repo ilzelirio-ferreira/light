@@ -59,12 +59,12 @@ Cada canal e um endpoint Matter On/Off independente, na ordem abaixo:
 
 | Canal | Saida do rele (S) | Entrada do interruptor (E) |
 | --- | --- | --- |
-| 1 | GPIO 39 | GPIO 40 |
-| 2 | GPIO 37 | GPIO 38 |
-| 3 | GPIO 35 | GPIO 36 |
-| 4 | GPIO 33 | GPIO 34 |
-| 5 | GPIO 18 | GPIO 21 |
-| 6 | GPIO 16 | GPIO 17 |
+| 1 | GPIO 39 | GPIO 34 |
+| 2 | GPIO 37 | GPIO 21 |
+| 3 | GPIO 35 | GPIO 17 |
+| 4 | GPIO 33 | GPIO 40 |
+| 5 | GPIO 18 | GPIO 38 |
+| 6 | GPIO 16 | GPIO 36 |
 
 As seis saidas sao ativas em HIGH para acionar MOC3023: HIGH liga e LOW desliga. Cada entrada recebe o coletor (pino 4) de
 um PC817, com emissor (pino 3) ao GND do ESP32 e pull-up para 3,3 V.
